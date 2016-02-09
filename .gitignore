@@ -1,0 +1,12 @@
+/Debug
+/Build
+*
+!Header.hpp
+!Source.cpp
+!main.cpp
+!fasta.txt
+!parameters.config
+!test5.txt
+!ananthTest.txt
+!.gitignore
+!README.md
