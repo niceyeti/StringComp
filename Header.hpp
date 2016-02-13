@@ -31,6 +31,11 @@ typedef struct Parameters {
     int g;
 }Params;
 
+typedef struct sequence{
+  string seq;
+  string desc;
+}Sequence;
+
 class Alignment {
 public:
 
@@ -71,7 +76,7 @@ class SequenceComparer
         SequenceComparer();
         ~SequenceComparer();
 
-        void PrintResult(const string& seq1, const string& seq2, const Params& params, const Alignment& alignment);
+        void PrintResult(const Sequence& sequence1, const Sequence& sequence2, const Params& params, const Alignment& alignment);
         void NeedlemanWunsch(const string& seq1, const string& seq2, Params& params, Alignment& alignment);
         void SmithWaterman(const string& seq1, const string& seq2, Params& params, Alignment& alignment);
         //needleman-wunsch
@@ -79,9 +84,9 @@ class SequenceComparer
         //string GetLCS(string s1, string s2);
 };
 
-void ParseFastaFile(const string fname, string& s1, string& s2);
+void ParseFastaFile(const string fname, Sequence& s1, Sequence& s2);
 void ParseParamsFile(const string& fname, Params& params);
-
+bool fileExists(const string& path);
 
 
 

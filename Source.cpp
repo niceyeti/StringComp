@@ -42,20 +42,22 @@ void SequenceComparer::_resize(int rows, int cols)
     }
 }
 
-void SequenceComparer::PrintResult(const string& seq1, const string& seq2, const Params& params, const Alignment& alignment)
+void SequenceComparer::PrintResult(const Sequence& sequence1, const Sequence& sequence2, const Params& params, const Alignment& alignment)
 {
     int i, j, k, n, s1Ct, s2Ct;
+    const string& seq1 = sequence1.seq;
+    const string& seq2 = sequence2.seq;
 
     cout << "INPUT:\r\n******\r\n";
 
-    cout << "\r\ns1>\r\n";
+    cout << "\r\n" << sequence1.desc << ">\r\n";
     for (i = 0; i < seq1.size(); i++) {
         cout << seq1[i];
         if (i % 60 == 59)
             cout << "\r\n";
     }
 
-    cout << "\r\ns2>\r\n";
+    cout << "\r\n" << sequence2.desc << ">\r\n";
     for (i = 0; i < seq2.size(); i++) {
         cout << seq2[i];
         if (i % 60 == 59)
@@ -68,8 +70,8 @@ void SequenceComparer::PrintResult(const string& seq1, const string& seq2, const
     cout << "scores:    match = " << params.match << ", mismatch = " << params.mismatch;
     cout << ", h = " << params.h << ", g = " << params.g << "\r\n\r\n";
     
-    cout << "Sequence 1 = " << "\"s1\" " << ", length = " << seq1.length() << "\r\n";
-    cout << "Sequence 2 = " << "\"s2\" " << ", length = " << seq2.length() << "\r\n" << endl;
+    cout << "Sequence 1 = \"" << sequence1.desc << "\", length = " << seq1.length() << "\r\n";
+    cout << "Sequence 2 = \"" << sequence2.desc << "\", length = " << seq2.length() << "\r\n" << endl;
 
     if (!((alignment.bridge.size() == alignment.s1.size()) && (alignment.bridge.size() == alignment.s2.size()) && alignment.s1.size() == alignment.s2.size())) {
         cout << "ERROR alignments should be of equal size. bridge=" << alignment.bridge.size();
@@ -108,10 +110,9 @@ void SequenceComparer::PrintResult(const string& seq1, const string& seq2, const
     cout << endl;
 
     //Reporting
-    //int identities = seq1.length() > seq2.length() ? seq1.length() : seq2.length();
     int identities = alignment.bridge.size();
-    cout << "alignment lengths (s1,s2,bridge): " << alignment.s1.length() << " " << alignment.s2.length() << " " << alignment.bridge.length() << endl;
-    cout << "Report:\r\n\r\nGlobal optimal score = " << alignment.maxScore << endl;
+    //cout << "alignment lengths (s1,s2,bridge): " << alignment.s1.length() << " " << alignment.s2.length() << " " << alignment.bridge.length() << endl;
+    cout << "Report:\r\n\r\n" << alignment.method << " score = " << alignment.maxScore << endl;
     cout << "Number of:   matches = " << alignment.matches << ", mismatches = " << alignment.mismatches;
     cout << ", gaps = " << alignment.gaps << ", opening gaps = " << alignment.openingGaps << endl;
     cout << "Identities: " << alignment.matches << "/" << identities;
@@ -190,7 +191,7 @@ void SequenceComparer::NeedlemanWunsch(const string& seq1, const string& seq2, P
 
     //_printTable(_dpTable);
 
-    cout << "Backtracking to find optimal alignment..." << endl;
+    cout << "\r\nBacktracking to find optimal alignment..." << endl;
     //global backtrack: from bottom-right cell to find optimal alignment, and track score
     int previousTraversal;
     i = _dpTable.size() - 1;
@@ -299,7 +300,7 @@ void SequenceComparer::SmithWaterman(const string& seq1, const string& seq2, Par
 
     //_printTable(_dpTable);
 
-    cout << "Backtracking to find optimal alignment..." << endl;
+    cout << "\r\nBacktracking to find optimal alignment..." << endl;
     //global backtrack: from bottom-right cell to find optimal alignment, and track score
     int previousTraversal;
     i = maxIndices.first;
@@ -491,13 +492,16 @@ string filter(const string& s, const string& validChars)
 /*
 
 */
-void ParseFastaFile(const string fname, string& s1, string& s2)
+void ParseFastaFile(const string fname, Sequence& seq1, Sequence& seq2)
 {
     int seqnum;
     ifstream myReadFile;
     myReadFile.open(fname);
     string line;
     string validBases = "atcg";
+
+    string& s1 = seq1.seq;
+    string& s2 = seq2.seq;
 
     if (myReadFile.is_open()) {
         //init
@@ -506,8 +510,12 @@ void ParseFastaFile(const string fname, string& s1, string& s2)
         seqnum = 0;
 
         while (getline(myReadFile, line)) {
-            //check if line begins with '>'; if so, advance state, but ignore line
+            //check if line begins with '>'; if so, advance state, and grab the description line
             if (line.length() > 0 && line[0] == '>') {
+                if(seqnum==0) 
+                    seq1.desc = line.substr(1,line.length()); 
+                else
+                    seq2.desc = line.substr(1,line.length()); 
                 seqnum++;
             }
             else {
@@ -529,9 +537,9 @@ void ParseFastaFile(const string fname, string& s1, string& s2)
     }
     myReadFile.close();
 
-    cout << "Parsed sequences:" << endl;;
-    cout << "s1 >>" << s1 << endl;
-    cout << "s2 >>" << s2 << endl;
+    //cout << "Parsed sequences:" << endl;;
+    //cout << "s1 >>" << s1 << endl;
+    //cout << "s2 >>" << s2 << endl;
 }
 
 void ParseParamsFile(const string& fname, Params& params)
@@ -575,3 +583,18 @@ void ParseParamsFile(const string& fname, Params& params)
 
     cout << "Parsed params (mismatch,match,g,h): " << params.mismatch << "," << params.match << "," << params.g << "," << params.h << endl;
 }
+
+bool fileExists(const string& path)
+{
+  ifstream myStream(path);
+
+  bool fileAccessible = !myStream.fail(); 
+  if(fileAccessible){
+    myStream.close();
+  }
+
+  return fileAccessible;
+}
+
+
+
