@@ -10,15 +10,18 @@
 
 using namespace std;
 
+//consider using this to cut down on matrix size, using smallest native int possible, capable of holding max/min possible score.
+//could also split score types since SW only needs unsigned positive values.
+typedef int SCORE;
 typedef enum { DEL, INS, SUB } CellFlag;
 //typedef enum { GLOBAL, SEMIGLOBAL, LOCAL } AlignmentStrategy;
 
 #define NEG_INF -1000000000  //from limits.h
 
 typedef struct DpCell {
-    int deletionScore;
-    int insertionScore;
-    int substitutionScore;
+    SCORE deletionScore;
+    SCORE insertionScore;
+    SCORE substitutionScore;
     //CellFlag flag;
     ///... // add any other field(s) that you may need for the implementation
 }Cell;

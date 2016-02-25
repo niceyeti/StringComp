@@ -193,13 +193,65 @@ void SequenceComparer::NeedlemanWunsch(const string& seq1, const string& seq2, P
 
     cout << "\r\nBacktracking to find optimal alignment..." << endl;
     //global backtrack: from bottom-right cell to find optimal alignment, and track score
-    int previousTraversal;
+    int previousTraversal = SUB;
     i = _dpTable.size() - 1;
     j = _dpTable[0].size() - 1;
     alignment.Clear();
     alignment.maxScore = _maxThree(_dpTable[i][j].deletionScore, _dpTable[i][j].insertionScore, _dpTable[i][j].substitutionScore);
     //traverses the cells of the optimal path from cell(i,j)
-    while (i > 0 && j > 0) {
+    Cell& cell = _dpTable[i][j];
+    if (cell.deletionScore >= cell.insertionScore && cell.deletionScore >= cell.substitutionScore) {
+      state = DEL;
+
+    }
+    else if (cell.insertionScore >= cell.deletionScore && cell.insertionScore >= cell.substitutionScore) {
+      state = INS;
+
+    }
+    else{ //assume substitution for all other cases, so traverse diagonally up and left
+      state = SUB;
+
+    }
+
+    while(i > 0 && j > 0){
+      switch(state){
+        case DEL:
+          //get max predecessor, given deletion, by affine rules
+          Cell& up = _dpTable[i-1][j];
+          //given we're in the DEL state, get state of max of predecessor scores using affine rules
+          state = nextState(DEL,up,params);
+          updateAlignment(DEL,state,alignment); //generic code for (curState, nextState)
+          if(state == DEL){
+            
+          }
+          else if(state == INS){
+
+          }
+          else{
+
+          }
+
+          break;
+
+        case INS:
+          //get max predecessor, given insertion, by affine rules
+
+          break;
+
+        case SUB:
+          //get max predecessor, given substitution
+
+          break;
+        default:
+            cout << "UNKNOWN BACKTRACK STATE" << endl;
+          break;
+      } 
+
+
+    }
+
+
+/*    while (i > 0 && j > 0) {
         Cell& cell = _dpTable[i][j];
 
         //deletion score is max, so traverse up
@@ -242,7 +294,24 @@ void SequenceComparer::NeedlemanWunsch(const string& seq1, const string& seq2, P
             previousTraversal = SUB;
             i--; j--;
         }
-    }
+    }*/
+    
+    _clearTable();
+}
+
+//Given a current backtrack state (DEL,SUB,INS) this applies the affine rules in reverse to find the next direction to traverse.
+int SequenceComparer::backState(int state, const Cell& cell)
+{
+  int nextState = SUB;
+
+  switch(state){
+    case SUB:
+      
+
+      break;
+  }
+
+
 }
 
 void SequenceComparer::SmithWaterman(const string& seq1, const string& seq2, Params& params, Alignment& alignment)
@@ -352,6 +421,8 @@ void SequenceComparer::SmithWaterman(const string& seq1, const string& seq2, Par
             i--; j--;
         }
     }
+
+    _clearTable();
 }
 
 void SequenceComparer::_printTable(const vector<vector<DpCell> >& dpTable)
