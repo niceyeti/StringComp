@@ -148,7 +148,7 @@ This implementation follows the matrix formality of having seq1 represented row-
 */
 void SequenceComparer::NeedlemanWunsch(const string& seq1, const string& seq2, Params& params, Alignment& alignment)
 {
-    int i, j, state, nextState;
+    int i, j, state, prevState;
     bool isMatch;
 
     alignment.method = "NeedlemanWunsch";
@@ -194,7 +194,6 @@ void SequenceComparer::NeedlemanWunsch(const string& seq1, const string& seq2, P
 
     cout << "\r\nBacktracking to find optimal alignment..." << endl;
     //global backtrack: from bottom-right cell to find optimal alignment, and track score
-    int previousTraversal = SUB;
     i = _dpTable.size() - 1;
     j = _dpTable[0].size() - 1;
     alignment.Clear();
@@ -211,47 +210,50 @@ void SequenceComparer::NeedlemanWunsch(const string& seq1, const string& seq2, P
       state = SUB;
     }
 
-    while(i > 0 && j > 0){
-      isMatch = seq[i] == seq2[j];
+    while(i >= 0 && j >= 0){
+      isMatch = seq1[i] == seq2[j];
+      prevState = state;
+
       switch(state){
         case DEL:
           //given we're in the DEL state, get state of the max of predecessor scores using affine rules
           state = _prevState(DEL, _dpTable[i-1][j], params, isMatch);
-          //_updateAlignment(DEL,state,alignment);
           break;
 
         case INS:
           //given we're in the INS state, get state of the max of predecessor scores using affine rules
           state = _prevState(INS, _dpTable[i][j-1], params, isMatch);
-          //_updateAlignment(INS,state,alignment);
           break;
 
         case SUB:
           //given we're in the SUB state, get state of the max of predecessor scores using affine rules
           state = _prevState(SUB, _dpTable[i-1][j-1], params, isMatch);
-          //_updateAlignment(DEL, state, alignment, );
           break;
+
         default:
             cout << "UNKNOWN BACKTRACK STATE: " << state << endl;
           break;
       }
 
-      _updateAlignment(state, nextState, alignment, isMatch, i, j, seq1, seq2);
+      _updateAlignment(state, prevState, alignment, isMatch, i, j, seq1, seq2);
 
       //update the table indices
       switch(state){
-        case DEL:
-          j--;
-            break;
-        case INS:
+        case DEL: //traverse to previous row
           i--;
-            break;
-        case SUB:
+        break;
+
+        case INS: //traverse to previous column
+          j--;
+        break;
+
+        case SUB: //traverse to previous row and previous column
           j--; i--;
-            break;
+        break;
+        
         default:
           cout << "UKNOWN BACKTRACK STATE" << endl;
-            break;
+        break;
       }
     }
 
@@ -356,6 +358,7 @@ void SequenceComparer::_updateAlignment(const int curState, const int prevState,
     }
     alignment.s1 = seq1[i] + alignment.s1;
     alignment.s2 = "-" + alignment.s2;
+    alignment.bridge = " " + alignment.bridge;
   }
   else if(curState == INS){  //insertion
     alignment.gaps++;
@@ -364,6 +367,7 @@ void SequenceComparer::_updateAlignment(const int curState, const int prevState,
     }
     alignment.s1 = "-" + alignment.s1;
     alignment.s2 = seq2[j] + alignment.s2;
+    alignment.bridge = " " + alignment.bridge;
   }
   else if(curState == SUB){  //substitution
     if(isMatch){
