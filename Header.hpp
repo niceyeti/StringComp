@@ -58,6 +58,7 @@ public:
     string bridge;
     void Clear();
     void Print();
+    void PrintValidity(const Parameters& params) const;
 };
 
 class SequenceComparer

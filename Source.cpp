@@ -17,6 +17,15 @@ void Alignment::Clear()
     bridge.clear();
 }
 
+void Alignment::PrintValidity(const Parameters& params) const
+{
+  cout << "parameters g, h, ma, mi: " << params.g << " " << params.h << " " << params.match << " " << params.mismatch << endl;
+  cout << "gaps, openingGaps, matches, mismatches: " << gaps << " " << openingGaps << " " << matches << " " << mismatches << endl;
+  cout << "Max score= " << maxScore << endl;
+  int score = gaps * params.g + openingGaps * params.h + mismatches * params.mismatch + matches * params.match;
+  cout << "g*gaps + h*openingGaps + mi*mismatches + ma*matches = " << score << endl;
+}
+
 SequenceComparer::SequenceComparer()
 {}
 
@@ -119,6 +128,8 @@ void SequenceComparer::PrintResult(const Sequence& sequence1, const Sequence& se
     cout << " (" << (int)(((float)alignment.matches / (float)identities) * 100) << "%)";
     cout << ", Gaps = " << alignment.gaps << "/" << identities << " (" << (int)(((float)alignment.gaps / (float)identities) * 100) << "%)";
     cout << endl;
+
+    alignment.PrintValidity(params);
 }
 
 /*
@@ -211,9 +222,10 @@ void SequenceComparer::NeedlemanWunsch(const string& seq1, const string& seq2, P
       state = SUB;
     }
 
-    while(i >= 0 && j >= 0){
-      isMatch = seq1[i] == seq2[j];
+    while(i > 0 && j > 0){
+      isMatch = seq1[i-1] == seq2[j-1];
       prevState = state;
+      _updateAlignment(state, prevState, alignment, isMatch, i, j, seq1, seq2);
 
       switch(state){
         case DEL:
@@ -236,7 +248,7 @@ void SequenceComparer::NeedlemanWunsch(const string& seq1, const string& seq2, P
           break;
       }
 
-      _updateAlignment(state, prevState, alignment, isMatch, i, j, seq1, seq2);
+      //_updateAlignment(state, prevState, alignment, isMatch, i, j, seq1, seq2);
 
       //update the table indices
       switch(state){
@@ -300,6 +312,7 @@ void SequenceComparer::NeedlemanWunsch(const string& seq1, const string& seq2, P
             i--; j--;
         }
     }*/
+    
     
     _clearTable();
 }
