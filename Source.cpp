@@ -198,6 +198,7 @@ void SequenceComparer::NeedlemanWunsch(const string& seq1, const string& seq2, P
     j = _dpTable[0].size() - 1;
     alignment.Clear();
     alignment.maxScore = _maxThree(_dpTable[i][j].deletionScore, _dpTable[i][j].insertionScore, _dpTable[i][j].substitutionScore);
+    cout << "MAx score IS: " << alignment.maxScore << endl;
     Cell& cell = _dpTable[i][j];
     //get the first maximal state from the bottom/right-most cell
     if (cell.deletionScore >= cell.insertionScore && cell.deletionScore >= cell.substitutionScore) {
@@ -217,17 +218,17 @@ void SequenceComparer::NeedlemanWunsch(const string& seq1, const string& seq2, P
       switch(state){
         case DEL:
           //given we're in the DEL state, get state of the max of predecessor scores using affine rules
-          state = _prevState(DEL, _dpTable[i-1][j], params, isMatch);
+          state = _getPrevState(DEL, _dpTable[i-1][j], params, isMatch);
           break;
 
         case INS:
           //given we're in the INS state, get state of the max of predecessor scores using affine rules
-          state = _prevState(INS, _dpTable[i][j-1], params, isMatch);
+          state = _getPrevState(INS, _dpTable[i][j-1], params, isMatch);
           break;
 
         case SUB:
           //given we're in the SUB state, get state of the max of predecessor scores using affine rules
-          state = _prevState(SUB, _dpTable[i-1][j-1], params, isMatch);
+          state = _getPrevState(SUB, _dpTable[i-1][j-1], params, isMatch);
           break;
 
         default:
@@ -242,15 +243,12 @@ void SequenceComparer::NeedlemanWunsch(const string& seq1, const string& seq2, P
         case DEL: //traverse to previous row
           i--;
         break;
-
         case INS: //traverse to previous column
           j--;
         break;
-
         case SUB: //traverse to previous row and previous column
           j--; i--;
         break;
-        
         default:
           cout << "UKNOWN BACKTRACK STATE" << endl;
         break;
@@ -306,9 +304,16 @@ void SequenceComparer::NeedlemanWunsch(const string& seq1, const string& seq2, P
     _clearTable();
 }
 
-//Given a current backtrack state (DEL,SUB,INS) this applies the affine rules in reverse to find the next direction
-//(backtrack state) in which to traverse.
-int SequenceComparer::_prevState(const int curState, const Cell& cell, const Params& params, const bool isMatch)
+/*
+Given a current backtrack state (DEL,SUB,INS) this applies the affine rules in reverse to find the next direction
+(backtrack state) in which to traverse.
+
+curState: The method by which this cell was entered: DEL, INS, or SUB.
+cell: The cell just entered.
+params: The scoring parameters
+isMatch: whether or not the characters in seq1 and seq2 match at this cell
+*/
+int SequenceComparer::_getPrevState(const int curState, const Cell& cell, const Params& params, const bool isMatch)
 {
   int sub, del, ins;
   int previous;
@@ -347,7 +352,14 @@ int SequenceComparer::_prevState(const int curState, const Cell& cell, const Par
 }
 
 /*
-  Modifies score
+Updates the alignment and score, while backtracking.
+
+curState: The method by which we entered the current max cell (INS, DEL, or SUB)
+prevState: The pethod by which we entered the previous max cell (INS, DEL, or SUB); is used to detect opening gaps by edge-detecting wrt curState.
+alignment: The alignment and score info
+isMatch: Whether or not the current chars in the current max cell match one another
+i: row of current cell, and ith index of seq1
+j: col of current cell, and jth index of seq2
 */
 void SequenceComparer::_updateAlignment(const int curState, const int prevState, Alignment& alignment, const bool isMatch, const int i, const int j, const string& seq1, const string& seq2)
 {
