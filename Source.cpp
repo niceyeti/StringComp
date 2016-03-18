@@ -148,7 +148,8 @@ This implementation follows the matrix formality of having seq1 represented row-
 */
 void SequenceComparer::NeedlemanWunsch(const string& seq1, const string& seq2, Params& params, Alignment& alignment)
 {
-    int i, j;
+    int i, j, state, nextState;
+    bool isMatch;
 
     alignment.method = "NeedlemanWunsch";
 
@@ -198,56 +199,60 @@ void SequenceComparer::NeedlemanWunsch(const string& seq1, const string& seq2, P
     j = _dpTable[0].size() - 1;
     alignment.Clear();
     alignment.maxScore = _maxThree(_dpTable[i][j].deletionScore, _dpTable[i][j].insertionScore, _dpTable[i][j].substitutionScore);
-    //traverses the cells of the optimal path from cell(i,j)
     Cell& cell = _dpTable[i][j];
+    //get the first maximal state from the bottom/right-most cell
     if (cell.deletionScore >= cell.insertionScore && cell.deletionScore >= cell.substitutionScore) {
       state = DEL;
-
     }
     else if (cell.insertionScore >= cell.deletionScore && cell.insertionScore >= cell.substitutionScore) {
       state = INS;
-
     }
-    else{ //assume substitution for all other cases, so traverse diagonally up and left
+    else{ //assume substitution for all other cases
       state = SUB;
-
     }
 
     while(i > 0 && j > 0){
+      isMatch = seq[i] == seq2[j];
       switch(state){
         case DEL:
-          //get max predecessor, given deletion, by affine rules
-          Cell& up = _dpTable[i-1][j];
-          //given we're in the DEL state, get state of max of predecessor scores using affine rules
-          state = nextState(DEL,up,params);
-          updateAlignment(DEL,state,alignment); //generic code for (curState, nextState)
-          if(state == DEL){
-            
-          }
-          else if(state == INS){
-
-          }
-          else{
-
-          }
-
+          //given we're in the DEL state, get state of the max of predecessor scores using affine rules
+          state = _prevState(DEL, _dpTable[i-1][j], params, isMatch);
+          //_updateAlignment(DEL,state,alignment);
           break;
 
         case INS:
-          //get max predecessor, given insertion, by affine rules
-
+          //given we're in the INS state, get state of the max of predecessor scores using affine rules
+          state = _prevState(INS, _dpTable[i][j-1], params, isMatch);
+          //_updateAlignment(INS,state,alignment);
           break;
 
         case SUB:
-          //get max predecessor, given substitution
-
+          //given we're in the SUB state, get state of the max of predecessor scores using affine rules
+          state = _prevState(SUB, _dpTable[i-1][j-1], params, isMatch);
+          //_updateAlignment(DEL, state, alignment, );
           break;
         default:
-            cout << "UNKNOWN BACKTRACK STATE" << endl;
+            cout << "UNKNOWN BACKTRACK STATE: " << state << endl;
           break;
-      } 
+      }
 
+      _updateAlignment(state, nextState, alignment, isMatch, i, j, seq1, seq2);
 
+      //update the table indices
+      switch(state){
+        case DEL:
+          j--;
+            break;
+        case INS:
+          i--;
+            break;
+        case SUB:
+          j--; i--;
+            break;
+        default:
+          cout << "UKNOWN BACKTRACK STATE" << endl;
+            break;
+      }
     }
 
 
@@ -299,19 +304,84 @@ void SequenceComparer::NeedlemanWunsch(const string& seq1, const string& seq2, P
     _clearTable();
 }
 
-//Given a current backtrack state (DEL,SUB,INS) this applies the affine rules in reverse to find the next direction to traverse.
-int SequenceComparer::backState(int state, const Cell& cell)
+//Given a current backtrack state (DEL,SUB,INS) this applies the affine rules in reverse to find the next direction
+//(backtrack state) in which to traverse.
+int SequenceComparer::_prevState(const int curState, const Cell& cell, const Params& params, const bool isMatch)
 {
-  int nextState = SUB;
+  int sub, del, ins;
+  int previous;
 
-  switch(state){
+  switch(curState){
     case SUB:
-      
+      sub = isMatch ? (cell.substitutionScore + params.match) : (cell.substitutionScore + params.mismatch);
+      del = isMatch ? (cell.deletionScore + params.match) : (cell.deletionScore + params.mismatch);
+      ins = isMatch ? (cell.insertionScore + params.match) : (cell.insertionScore + params.mismatch);
+    break;
 
-      break;
+    case DEL:
+      sub = cell.substitutionScore + params.h + params.g;
+      ins = cell.insertionScore + params.h + params.g;
+      del = cell.deletionScore + params.g;
+    break;
+
+    case INS:
+      sub = cell.substitutionScore + params.h + params.g;
+      ins = cell.insertionScore + params.g;
+      del = cell.deletionScore + params.h + params.g;
+    break;
   }
 
+  if(ins >= del && ins >= sub){
+    previous = INS;
+  }
+  else if(del >= ins && del >= sub){
+    previous = DEL;
+  }
+  else{
+    previous = SUB;
+  }
 
+  return previous;
+}
+
+/*
+  Modifies score
+*/
+void SequenceComparer::_updateAlignment(const int curState, const int prevState, Alignment& alignment, const bool isMatch, const int i, const int j, const string& seq1, const string& seq2)
+{
+  if(curState == DEL){  //deletion
+    alignment.gaps++;
+    if(prevState != DEL){
+      alignment.openingGaps++;
+    }
+    alignment.s1 = seq1[i] + alignment.s1;
+    alignment.s2 = "-" + alignment.s2;
+  }
+  else if(curState == INS){  //insertion
+    alignment.gaps++;
+    if(prevState != INS){
+      alignment.openingGaps++;
+    }
+    alignment.s1 = "-" + alignment.s1;
+    alignment.s2 = seq2[j] + alignment.s2;
+  }
+  else if(curState == SUB){  //substitution
+    if(isMatch){
+      alignment.matches++;
+      alignment.s1 = seq1[i] + alignment.s1;
+      alignment.s2 = seq2[j] + alignment.s2;
+      alignment.bridge = "|" + alignment.bridge;
+    }
+    else{
+      alignment.mismatches++;
+      alignment.s1 = seq1[i] + alignment.s1;
+      alignment.s2 = seq2[j] + alignment.s2;
+      alignment.bridge = " " + alignment.bridge;
+    }
+  }
+  else{
+    cout << "ERROR unmapped state in updateAlignment" << endl;
+  }
 }
 
 void SequenceComparer::SmithWaterman(const string& seq1, const string& seq2, Params& params, Alignment& alignment)

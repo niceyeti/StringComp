@@ -74,6 +74,8 @@ class SequenceComparer
         int _getAffineDeletionScore(const DpCell& predecessor, const Params& params);
         int _getAffineInsertionScore(const DpCell& predecessor, const Params& params);
         int _getAffineSubstitutionScore(bool isMatch, const DpCell& predecessor, const Params& params);
+        void _updateAlignment(const int curState, const int prevState, Alignment& alignment, const bool isMatch, const int i, const int j, const string& seq1, const string& seq2);
+        int _prevState(const int curState, const Cell& cell, const Params& params, const bool isMatch);
 
     public:
         SequenceComparer();
