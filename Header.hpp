@@ -72,6 +72,7 @@ class SequenceComparer
         void _scoreAffine_NeedlemanWunsch(char a, char b, int row, int col, vector<vector<DpCell> >& dpTable, const Params& params);
         void _scoreAffine_SmithWaterman(char a, char b, int row, int col, vector<vector<DpCell> >& dpTable, const Params& params);
         void _printTable(const vector<vector<DpCell> >& dpTable);
+        int _getMaxDirection(const Cell& predecessor);
         int _getAffineDeletionScore(const DpCell& predecessor, const Params& params);
         int _getAffineInsertionScore(const DpCell& predecessor, const Params& params);
         int _getAffineSubstitutionScore(bool isMatch, const DpCell& predecessor, const Params& params);

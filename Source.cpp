@@ -152,6 +152,29 @@ void SequenceComparer::_reportProgress(int row, int numRows)
 }
 
 /*
+A backtracking utility. Given that some cell has already had its scores decremented, find the max direction
+of those scores.
+*/
+int SequenceComparer::_getMaxDirection(const Cell& predecessor)
+{
+  int state = SUB;
+
+  //get the first maximal state from the bottom/right-most cell
+  if (predecessor.deletionScore >= predecessor.insertionScore && predecessor.deletionScore >= predecessor.substitutionScore) {
+    state = DEL;
+  }
+  else if (predecessor.insertionScore >= predecessor.deletionScore && predecessor.insertionScore >= predecessor.substitutionScore) {
+    state = INS;
+  }
+  else{ //assume substitution for all other cases
+    state = SUB;
+  }
+
+  return state;
+}
+
+
+/*
 Implements NeedlemanWunsch algorithm using an affine scoring strategy. The algorithm may use either
 local or global alignment.
 
@@ -210,18 +233,63 @@ void SequenceComparer::NeedlemanWunsch(const string& seq1, const string& seq2, P
     alignment.Clear();
     alignment.maxScore = _maxThree(_dpTable[i][j].deletionScore, _dpTable[i][j].insertionScore, _dpTable[i][j].substitutionScore);
     cout << "MAx score IS: " << alignment.maxScore << endl;
-    Cell& cell = _dpTable[i][j];
     //get the first maximal state from the bottom/right-most cell
-    if (cell.deletionScore >= cell.insertionScore && cell.deletionScore >= cell.substitutionScore) {
-      state = DEL;
-    }
-    else if (cell.insertionScore >= cell.deletionScore && cell.insertionScore >= cell.substitutionScore) {
-      state = INS;
-    }
-    else{ //assume substitution for all other cases
-      state = SUB;
+    state = _getMaxDirection(_dpTable[i][j]);
+
+/*
+    int ins = predecessor.insertionScore + params.g;
+    int sub = predecessor.substitutionScore + params.h + params.g;
+    int del = predecessor.deletionScore + params.h + params.g;
+
+    int ins = predecessor.insertionScore + params.g;
+    int sub = predecessor.substitutionScore + params.h + params.g;
+    int del = predecessor.deletionScore + params.h + params.g;
+*/
+
+    while(i > 0 && j > 0){
+      isMatch = seq1[i-1] == seq2[j-1]; //minus one, since the table has an extra row and column wrt the string lengths.
+
+      switch(state){
+        case DEL:
+          i--;
+          _dpTable[i][j].deletionScore -= params.g;
+          _dpTable[i][j].substitutionScore -= (params.h + params.g);
+          _dpTable[i][j].insertionScore -= (params.h + params.g);
+        break;
+
+        case INS:
+          j--;
+          _dpTable[i][j].insertionScore -= params.g;
+          _dpTable[i][j].substitutionScore -= (params.h + params.g);
+          _dpTable[i][j].deletionScore -= (params.h + params.g);
+        break;
+
+        case SUB:
+          i--; j--;
+          if (isMatch) {
+            _dpTable[i][j].deletionScore -= params.match;
+            _dpTable[i][j].insertionScore -= params.match;
+            _dpTable[i][j].substitutionScore -= params.match;
+          }
+          else {
+            _dpTable[i][j].deletionScore -= params.mismatch;
+            _dpTable[i][j].insertionScore -= params.mismatch;
+            _dpTable[i][j].substitutionScore -= params.mismatch;
+          }
+        break;
+
+        default:
+            cout << "UNKNOWN BACKTRACK STATE: " << state << endl;
+          break;
+      }
+
+      prevState = state;
+      state = _getMaxDirection(_dpTable[i][j]);
+      _updateAlignment(state, prevState, alignment, isMatch, i, j, seq1, seq2);
     }
 
+
+    /*
     while(i > 0 && j > 0){
       isMatch = seq1[i-1] == seq2[j-1];
       prevState = state;
@@ -266,6 +334,7 @@ void SequenceComparer::NeedlemanWunsch(const string& seq1, const string& seq2, P
         break;
       }
     }
+    */
 
 
 /*    while (i > 0 && j > 0) {
