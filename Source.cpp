@@ -23,7 +23,7 @@ void Alignment::PrintValidity(const Parameters& params) const
   cout << "gaps, openingGaps, matches, mismatches: " << gaps << " " << openingGaps << " " << matches << " " << mismatches << endl;
   cout << "Max score= " << maxScore << endl;
   int score = gaps * params.g + openingGaps * params.h + mismatches * params.mismatch + matches * params.match;
-  cout << "g*gaps + h*openingGaps + mi*mismatches + ma*matches = " << score << endl;
+  cout << "g * gaps + h * openingGaps + mi * mismatches + ma * matches = " << score << endl;
 }
 
 SequenceComparer::SequenceComparer()
@@ -232,49 +232,47 @@ void SequenceComparer::NeedlemanWunsch(const string& seq1, const string& seq2, P
     j = _dpTable[0].size() - 1;
     alignment.Clear();
     alignment.maxScore = _maxThree(_dpTable[i][j].deletionScore, _dpTable[i][j].insertionScore, _dpTable[i][j].substitutionScore);
-    cout << "MAx score IS: " << alignment.maxScore << endl;
-    //get the first maximal state from the bottom/right-most cell
-    state = _getMaxDirection(_dpTable[i][j]);
-
-/*
-    int ins = predecessor.insertionScore + params.g;
-    int sub = predecessor.substitutionScore + params.h + params.g;
-    int del = predecessor.deletionScore + params.h + params.g;
-
-    int ins = predecessor.insertionScore + params.g;
-    int sub = predecessor.substitutionScore + params.h + params.g;
-    int del = predecessor.deletionScore + params.h + params.g;
-*/
-
+    cout << "Max score is: " << alignment.maxScore << endl;
+    prevState = SUB;
+    cout << "cell 0 row sub score: " << _dpTable[0][3].substitutionScore << endl;
     while(i > 0 && j > 0){
-      isMatch = seq1[i-1] == seq2[j-1]; //minus one, since the table has an extra row and column wrt the string lengths.
 
+      //update isMatch
+      isMatch = false;
+      if(i > 0 && j > 0){
+        isMatch = seq1[i-1] == seq2[j-1]; //minus one, since the table has an extra row and column wrt the string lengths.
+      }
+      //get the first maximal state from the current cell
+      state = _getMaxDirection(_dpTable[i][j]);
+      _updateAlignment(state, prevState, alignment, isMatch, i-1, j-1, seq1, seq2);
+
+      //update the scores of the next cell, reversing the affine scoring rules
       switch(state){
         case DEL:
           i--;
-          _dpTable[i][j].deletionScore -= params.g;
-          _dpTable[i][j].substitutionScore -= (params.h + params.g);
-          _dpTable[i][j].insertionScore -= (params.h + params.g);
+          _dpTable[i][j].deletionScore += params.g;
+          _dpTable[i][j].substitutionScore = _dpTable[i][j].substitutionScore + params.h + params.g;
+          _dpTable[i][j].insertionScore = _dpTable[i][j].insertionScore + params.h + params.g;
         break;
 
         case INS:
           j--;
-          _dpTable[i][j].insertionScore -= params.g;
-          _dpTable[i][j].substitutionScore -= (params.h + params.g);
-          _dpTable[i][j].deletionScore -= (params.h + params.g);
+          _dpTable[i][j].insertionScore += params.g;
+          _dpTable[i][j].substitutionScore = _dpTable[i][j].substitutionScore + params.h + params.g;
+          _dpTable[i][j].deletionScore = _dpTable[i][j].deletionScore + params.h + params.g;
         break;
 
         case SUB:
           i--; j--;
           if (isMatch) {
-            _dpTable[i][j].deletionScore -= params.match;
-            _dpTable[i][j].insertionScore -= params.match;
-            _dpTable[i][j].substitutionScore -= params.match;
+            _dpTable[i][j].deletionScore += params.match;
+            _dpTable[i][j].insertionScore += params.match;
+            _dpTable[i][j].substitutionScore += params.match;
           }
           else {
-            _dpTable[i][j].deletionScore -= params.mismatch;
-            _dpTable[i][j].insertionScore -= params.mismatch;
-            _dpTable[i][j].substitutionScore -= params.mismatch;
+            _dpTable[i][j].deletionScore += params.mismatch;
+            _dpTable[i][j].insertionScore += params.mismatch;
+            _dpTable[i][j].substitutionScore += params.mismatch;
           }
         break;
 
@@ -284,10 +282,28 @@ void SequenceComparer::NeedlemanWunsch(const string& seq1, const string& seq2, P
       }
 
       prevState = state;
-      state = _getMaxDirection(_dpTable[i][j]);
-      _updateAlignment(state, prevState, alignment, isMatch, i, j, seq1, seq2);
+    }
+    //post loop: either i or j are zero (or both), so account for remaining cases in next loops
+
+    //met left column; so count all remaining j as deletions
+    while(j > 0){
+      state = DEL;
+      _updateAlignment(state, prevState, alignment, false, i-1, j-1, seq1, seq2);
+      prevState = DEL;
+      j--;
+    }
+    //met top row: so count all remaining i as insertions
+    while(i > 0){
+      state = INS;
+      _updateAlignment(state, prevState, alignment, false, i-1, j-1, seq1, seq2);
+      prevState = INS;
+      i--;
     }
 
+    //lastly, if the first state was INS or DEL, account for this as the opening gap it is
+    if(state == INS || state == DEL){
+      alignment.openingGaps++;
+    }
 
     /*
     while(i > 0 && j > 0){
@@ -440,45 +456,57 @@ curState: The method by which we entered the current max cell (INS, DEL, or SUB)
 prevState: The pethod by which we entered the previous max cell (INS, DEL, or SUB); is used to detect opening gaps by edge-detecting wrt curState.
 alignment: The alignment and score info
 isMatch: Whether or not the current chars in the current max cell match one another
-i: row of current cell, and ith index of seq1
-j: col of current cell, and jth index of seq2
+i: row of current cell - 1, and ith index of seq1
+j: col of current cell - 1, and jth index of seq2
 */
 void SequenceComparer::_updateAlignment(const int curState, const int prevState, Alignment& alignment, const bool isMatch, const int i, const int j, const string& seq1, const string& seq2)
 {
+  char c1, c2;
+
+  c1 = c2 = '-';
+  if(i >= 0){
+    c1 = seq1[i];
+  }
+  if(j >= 0){
+    c2 = seq2[j];
+  }
+
   if(curState == DEL){  //deletion
     alignment.gaps++;
-    if(prevState != DEL){
-      alignment.openingGaps++;
-    }
-    alignment.s1 = seq1[i] + alignment.s1;
+    alignment.s1 = c1 + alignment.s1;
     alignment.s2 = "-" + alignment.s2;
     alignment.bridge = " " + alignment.bridge;
   }
   else if(curState == INS){  //insertion
     alignment.gaps++;
-    if(prevState != INS){
-      alignment.openingGaps++;
-    }
     alignment.s1 = "-" + alignment.s1;
-    alignment.s2 = seq2[j] + alignment.s2;
+    alignment.s2 = c2 + alignment.s2;
     alignment.bridge = " " + alignment.bridge;
   }
   else if(curState == SUB){  //substitution
     if(isMatch){
       alignment.matches++;
-      alignment.s1 = seq1[i] + alignment.s1;
-      alignment.s2 = seq2[j] + alignment.s2;
+      alignment.s1 = c1 + alignment.s1;
+      alignment.s2 = c2 + alignment.s2;
       alignment.bridge = "|" + alignment.bridge;
     }
     else{
       alignment.mismatches++;
-      alignment.s1 = seq1[i] + alignment.s1;
-      alignment.s2 = seq2[j] + alignment.s2;
+      alignment.s1 = c1 + alignment.s1;
+      alignment.s2 = c2 + alignment.s2;
       alignment.bridge = " " + alignment.bridge;
     }
   }
   else{
     cout << "ERROR unmapped state in updateAlignment" << endl;
+  }
+
+  //account for opening gaps
+  if(curState != DEL && prevState == DEL){
+    alignment.openingGaps++;
+  }
+  if(curState != INS && prevState == INS){
+    alignment.openingGaps++;
   }
 }
 

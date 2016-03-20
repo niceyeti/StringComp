@@ -16,7 +16,7 @@ typedef int SCORE;
 typedef enum { DEL, INS, SUB } CellFlag;
 //typedef enum { GLOBAL, SEMIGLOBAL, LOCAL } AlignmentStrategy;
 
-#define NEG_INF -1000000000  //from limits.h
+#define NEG_INF -10000000
 
 typedef struct DpCell {
     SCORE deletionScore;
