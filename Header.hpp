@@ -78,6 +78,7 @@ class SequenceComparer
         int _getAffineSubstitutionScore(bool isMatch, const DpCell& predecessor, const Params& params);
         void _updateAlignment(const int curState, const int prevState, Alignment& alignment, const bool isMatch, const int i, const int j, const string& seq1, const string& seq2);
         int _getPrevState(const int curState, const Cell& cell, const Params& params, const bool isMatch);
+        bool _hasPositiveScore(const struct DpCell& cell);
 
     public:
         SequenceComparer();

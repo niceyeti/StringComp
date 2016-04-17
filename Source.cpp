@@ -418,8 +418,9 @@ void SequenceComparer::_updateAlignment(const int curState, const int prevState,
 
 void SequenceComparer::SmithWaterman(const string& seq1, const string& seq2, Params& params, Alignment& alignment)
 {
-    int i, j;
+    int i, j, state, prevState;
     int maxScore;
+    bool isMatch;
     pair<int, int> maxIndices;
 
     alignment.method = "SmithWaterman";
@@ -473,58 +474,94 @@ void SequenceComparer::SmithWaterman(const string& seq1, const string& seq2, Par
 
     cout << "\r\nBacktracking to find optimal alignment..." << endl;
     //global backtrack: from bottom-right cell to find optimal alignment, and track score
-    int previousTraversal;
+    //The only difference between NeedlemanWunsch and SW is where the backtracking begins: from the maxScore
+    //cell, rather than the last cell. TODO: Other than the entry point for backtracking, and loop backtrack
+    //condition, this code to the end of this function is the same as NeedlemanWunsch; refactor it.
     i = maxIndices.first;
     j = maxIndices.second;
     alignment.Clear();
     alignment.maxScore = _maxThree(_dpTable[i][j].deletionScore, _dpTable[i][j].insertionScore, _dpTable[i][j].substitutionScore);
-    //traverses the cells of the optimal path from cell(i,j) until no further positive path can be found
-    while (i > 0 && j > 0 && (_maxThree(_dpTable[i][j].deletionScore,_dpTable[i][j].insertionScore,_dpTable[i][j].substitutionScore) > 0)) {
-        Cell& cell = _dpTable[i][j];
+    cout << "Max score is: " << alignment.maxScore << endl;
+    prevState = SUB;
+    while (_hasPositiveScore(_dpTable[i][j]) && i > 0 && j > 0) {
+        //update isMatch
+        isMatch = seq1[i - 1] == seq2[j - 1]; //minus one, since the dp table has an extra row and column wrt the string lengths.
+        //get the first maximal state from the current cell
+        state = _getMaxDirection(_dpTable[i][j]);
+        _updateAlignment(state, prevState, alignment, isMatch, i - 1, j - 1, seq1, seq2);
 
-        //deletion score is max, so traverse up
-        if (cell.deletionScore >= cell.insertionScore && cell.deletionScore >= cell.substitutionScore) {
-            alignment.bridge = " " + alignment.bridge;
-            alignment.s1 = seq1[i - 1] + alignment.s1;
-            alignment.s2 = "-" + alignment.s2;
-            alignment.gaps++;
-            //look in upper cell: was this an opening deletion-gap?
-            if (previousTraversal != DEL) {
-                alignment.openingGaps++;
-            }
-            previousTraversal = DEL;
+        //update the scores of the next cell, reversing the affine scoring rules
+        switch (state) {
+        case DEL:
             i--;
-        }
-        //insertion score is max, so traverse left
-        else if (cell.insertionScore >= cell.deletionScore && cell.insertionScore >= cell.substitutionScore) {
-            alignment.bridge = " " + alignment.bridge;
-            alignment.s1 = "-" + alignment.s1;
-            alignment.s2 = seq2[j - 1] + alignment.s2;
-            alignment.gaps++;
-            //was this an opening insertion-gap?
-            if (previousTraversal != INS) {
-                alignment.openingGaps++;
-            }
-            previousTraversal = INS;
+            _dpTable[i][j].deletionScore += params.g;
+            _dpTable[i][j].substitutionScore = _dpTable[i][j].substitutionScore + params.h + params.g;
+            _dpTable[i][j].insertionScore = _dpTable[i][j].insertionScore + params.h + params.g;
+            break;
+
+        case INS:
             j--;
-        }
-        else { //assume substitution for all other cases, so traverse diagonally up and left
-            alignment.s1 = seq1[i - 1] + alignment.s1;
-            alignment.s2 = seq2[j - 1] + alignment.s2;
-            if (seq1[i - 1] == seq2[j - 1]) {
-                alignment.matches++;
-                alignment.bridge = "|" + alignment.bridge;
+            _dpTable[i][j].insertionScore += params.g;
+            _dpTable[i][j].substitutionScore = _dpTable[i][j].substitutionScore + params.h + params.g;
+            _dpTable[i][j].deletionScore = _dpTable[i][j].deletionScore + params.h + params.g;
+            break;
+
+        case SUB:
+            i--; j--;
+            if (isMatch) {
+                _dpTable[i][j].deletionScore += params.match;
+                _dpTable[i][j].insertionScore += params.match;
+                _dpTable[i][j].substitutionScore += params.match;
             }
             else {
-                alignment.mismatches++;
-                alignment.bridge = " " + alignment.bridge;
+                _dpTable[i][j].deletionScore += params.mismatch;
+                _dpTable[i][j].insertionScore += params.mismatch;
+                _dpTable[i][j].substitutionScore += params.mismatch;
             }
-            previousTraversal = SUB;
-            i--; j--;
+            break;
+
+        default:
+            cout << "UNKNOWN BACKTRACK STATE: " << state << endl;
+            break;
         }
+
+        prevState = state;
+    }
+    //post loop: either i or j are zero (or both), so account for remaining cases in next loops
+
+    /*
+    //met left column; so count all remaining j as deletions
+    while (j > 0) {
+        state = DEL;
+        _updateAlignment(state, prevState, alignment, false, i - 1, j - 1, seq1, seq2);
+        prevState = DEL;
+        j--;
+    }
+    //met top row: so count all remaining i as insertions
+    while (i > 0) {
+        state = INS;
+        _updateAlignment(state, prevState, alignment, false, i - 1, j - 1, seq1, seq2);
+        prevState = INS;
+        i--;
+    }
+    */
+
+    //lastly, if the first state was INS or DEL, account for this as the opening gap it is
+    if (state == INS || state == DEL) {
+        alignment.openingGaps++;
     }
 
     _clearTable();
+}
+
+/*
+A small utility for SmithWaterman, which baktracks from the max score cell only until there is no further
+positive score to backtrack from. Returns true if any of the cell's scores are positive, meaning there
+is some optimal alignment left for SmithWaterman.
+*/
+bool SequenceComparer::_hasPositiveScore(const struct DpCell& cell)
+{
+    return (cell.deletionScore > 0) || (cell.insertionScore > 0) || (cell.substitutionScore > 0);
 }
 
 void SequenceComparer::_printTable(const vector<vector<DpCell> >& dpTable)
@@ -540,10 +577,13 @@ void SequenceComparer::_printTable(const vector<vector<DpCell> >& dpTable)
 
 void SequenceComparer::_scoreAffine_SmithWaterman(char a, char b, int row, int col, vector<vector<DpCell> >& dpTable, const Params& params)
 {
+    //detect invalid indices off edges of table
+    /*
     if (row <= 0 || col <= 0 || row >= dpTable.size() || col >= dpTable[0].size()) {
         cout << "BAIL; indices in minThree invalid: (row,col)=" << row << ":" << col << endl;
         exit(1);
     }
+    */
 
     //get the deletion score for this cell, per affine rules
     dpTable[row][col].deletionScore = _getAffineDeletionScore(dpTable[row - 1][col], params);
