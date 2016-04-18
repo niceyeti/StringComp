@@ -1,4 +1,4 @@
-#include "Header.hpp"
+#include "SequenceAlignment.hpp"
 
 void Alignment::Print()
 {
@@ -26,10 +26,10 @@ void Alignment::PrintValidity(const Parameters& params) const
   cout << "g * gaps + h * openingGaps + mi * mismatches + ma * matches = " << score << endl;
 }
 
-SequenceComparer::SequenceComparer()
+SequenceAlignment::SequenceAlignment()
 {}
 
-SequenceComparer::~SequenceComparer()
+SequenceAlignment::~SequenceAlignment()
 {
     _clearTable();
 }
@@ -37,7 +37,7 @@ SequenceComparer::~SequenceComparer()
 /*
 Resizes the (square) matrix.
 */
-void SequenceComparer::_resize(int rows, int cols)
+void SequenceAlignment::_resize(int rows, int cols)
 {
     DpCell cell;
     cell.deletionScore = NEG_INF;
@@ -51,7 +51,7 @@ void SequenceComparer::_resize(int rows, int cols)
     }
 }
 
-void SequenceComparer::PrintResult(const Sequence& sequence1, const Sequence& sequence2, const Params& params, const Alignment& alignment)
+void SequenceAlignment::PrintResult(const Sequence& sequence1, const Sequence& sequence2, const Params& params, const Alignment& alignment)
 {
     int i, j, k, n, s1Ct, s2Ct;
     const string& seq1 = sequence1.seq;
@@ -135,7 +135,7 @@ void SequenceComparer::PrintResult(const Sequence& sequence1, const Sequence& se
 /*
 Zeroes the matrix.
 */
-void SequenceComparer::_clearTable()
+void SequenceAlignment::_clearTable()
 {
     for (int i = 0; i < _dpTable.size(); i++) {
         _dpTable[i].clear();
@@ -144,7 +144,7 @@ void SequenceComparer::_clearTable()
 }
 
 //Report progress every 50th row; clearly this ignores the cost/variation of row lengths
-void SequenceComparer::_reportProgress(int row, int numRows)
+void SequenceAlignment::_reportProgress(int row, int numRows)
 {
     if (row % 50 == 0) {
         cout << "\r" << (((float)row / (float)numRows) * 100.0) << "% complete...      " << flush;
@@ -155,7 +155,7 @@ void SequenceComparer::_reportProgress(int row, int numRows)
 A backtracking utility. Given that some cell has already had its scores decremented, find the max direction
 of those scores.
 */
-int SequenceComparer::_getMaxDirection(const Cell& predecessor)
+int SequenceAlignment::_getMaxDirection(const Cell& predecessor)
 {
   int state = SUB;
 
@@ -180,7 +180,7 @@ local or global alignment.
 
 This implementation follows the matrix formality of having seq1 represented row-wise, seq2 is column-wise.
 */
-void SequenceComparer::NeedlemanWunsch(const string& seq1, const string& seq2, Params& params, Alignment& alignment)
+void SequenceAlignment::NeedlemanWunsch(const string& seq1, const string& seq2, Params& params, Alignment& alignment)
 {
     int i, j, state, prevState;
     bool isMatch;
@@ -317,7 +317,7 @@ cell: The cell just entered.
 params: The scoring parameters
 isMatch: whether or not the characters in seq1 and seq2 match at this cell
 */
-int SequenceComparer::_getPrevState(const int curState, const Cell& cell, const Params& params, const bool isMatch)
+int SequenceAlignment::_getPrevState(const int curState, const Cell& cell, const Params& params, const bool isMatch)
 {
   int sub, del, ins;
   int previous;
@@ -365,7 +365,7 @@ isMatch: Whether or not the current chars in the current max cell match one anot
 i: row of current cell - 1, and ith index of seq1
 j: col of current cell - 1, and jth index of seq2
 */
-void SequenceComparer::_updateAlignment(const int curState, const int prevState, Alignment& alignment, const bool isMatch, const int i, const int j, const string& seq1, const string& seq2)
+void SequenceAlignment::_updateAlignment(const int curState, const int prevState, Alignment& alignment, const bool isMatch, const int i, const int j, const string& seq1, const string& seq2)
 {
   char c1, c2;
 
@@ -416,7 +416,7 @@ void SequenceComparer::_updateAlignment(const int curState, const int prevState,
   }
 }
 
-void SequenceComparer::SmithWaterman(const string& seq1, const string& seq2, Params& params, Alignment& alignment)
+void SequenceAlignment::SmithWaterman(const string& seq1, const string& seq2, Params& params, Alignment& alignment)
 {
     int i, j, state, prevState;
     int maxScore;
@@ -559,12 +559,12 @@ A small utility for SmithWaterman, which baktracks from the max score cell only 
 positive score to backtrack from. Returns true if any of the cell's scores are positive, meaning there
 is some optimal alignment left for SmithWaterman.
 */
-bool SequenceComparer::_hasPositiveScore(const struct DpCell& cell)
+bool SequenceAlignment::_hasPositiveScore(const struct DpCell& cell)
 {
     return (cell.deletionScore > 0) || (cell.insertionScore > 0) || (cell.substitutionScore > 0);
 }
 
-void SequenceComparer::_printTable(const vector<vector<DpCell> >& dpTable)
+void SequenceAlignment::_printTable(const vector<vector<DpCell> >& dpTable)
 {
     for (int i = 0; i < dpTable.size(); i++) {
         for (int j = 0; j < dpTable[i].size(); j++) {
@@ -575,7 +575,7 @@ void SequenceComparer::_printTable(const vector<vector<DpCell> >& dpTable)
     cout << endl;
 }
 
-void SequenceComparer::_scoreAffine_SmithWaterman(char a, char b, int row, int col, vector<vector<DpCell> >& dpTable, const Params& params)
+void SequenceAlignment::_scoreAffine_SmithWaterman(char a, char b, int row, int col, vector<vector<DpCell> >& dpTable, const Params& params)
 {
     //detect invalid indices off edges of table
     /*
@@ -613,7 +613,7 @@ For cell(i,j), the deletion score is:
         cell(i-1,j).substitutionScore + h + g
     }
 */
-int SequenceComparer::_getAffineDeletionScore(const DpCell& predecessor, const Params& params)
+int SequenceAlignment::_getAffineDeletionScore(const DpCell& predecessor, const Params& params)
 {
     int del = predecessor.deletionScore + params.g;
     int sub = predecessor.substitutionScore + params.h + params.g;
@@ -622,7 +622,7 @@ int SequenceComparer::_getAffineDeletionScore(const DpCell& predecessor, const P
     return _maxThree(del,sub,ins);
 }
 
-int SequenceComparer::_getAffineSubstitutionScore(bool isMatch,const DpCell& predecessor, const Params& params)
+int SequenceAlignment::_getAffineSubstitutionScore(bool isMatch,const DpCell& predecessor, const Params& params)
 {
     int max = _maxThree(predecessor.deletionScore,predecessor.substitutionScore,predecessor.insertionScore);
 
@@ -645,7 +645,7 @@ cell(i,j - 1).deletionScore + h + g
 cell(i,j - 1).substitutionScore + h + g
 }
 */
-int SequenceComparer::_getAffineInsertionScore(const DpCell& predecessor, const Params& params)
+int SequenceAlignment::_getAffineInsertionScore(const DpCell& predecessor, const Params& params)
 {
     int ins = predecessor.insertionScore + params.g;
     int sub = predecessor.substitutionScore + params.h + params.g;
@@ -659,7 +659,7 @@ int SequenceComparer::_getAffineInsertionScore(const DpCell& predecessor, const 
     according to affine/Needleman-Wunsch rules. Scoring could be maintained here, but is performed in the
     backtracking step; this is the forward alg.
 */
-void SequenceComparer::_scoreAffine_NeedlemanWunsch(char a, char b, int row, int col, vector<vector<DpCell> >& dpTable, const Params& params)
+void SequenceAlignment::_scoreAffine_NeedlemanWunsch(char a, char b, int row, int col, vector<vector<DpCell> >& dpTable, const Params& params)
 {
     if (row <= 0 || col <= 0 || row >= dpTable.size() || col >= dpTable[0].size()) {
         cout << "BAIL; indices in minThree invalid: (row,col)=" << row << ":" << col << endl;
@@ -674,7 +674,7 @@ void SequenceComparer::_scoreAffine_NeedlemanWunsch(char a, char b, int row, int
     dpTable[row][col].substitutionScore = _getAffineSubstitutionScore( (a==b), dpTable[row-1][col-1], params);
 }
 
-int SequenceComparer::_maxThree(int a, int b, int c)
+int SequenceAlignment::_maxThree(int a, int b, int c)
 {
     int max = b;
 

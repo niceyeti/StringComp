@@ -1,12 +1,36 @@
 #pragma once
+
+#ifndef _INC_STDIO
 #include <stdio.h>
+#endif
+
+#ifndef _STRING_
 #include <string>
+#endif
+
+#ifndef _CSTRING_
 #include <cstring>
+#endif
+
+#ifndef _IOSTREAM_
 #include <iostream>
+#endif
+
+#ifndef _FSTREAM_
 #include <fstream>
+#endif
+
+#ifndef _VECTOR_
 #include <vector>
+#endif
+
+#ifndef _ALGORITHM_
 #include <algorithm>
+#endif
+
+#ifndef _INC_LIMITS
 #include <limits.h>
+#endif
 
 using namespace std;
 
@@ -61,7 +85,7 @@ public:
     void PrintValidity(const Parameters& params) const;
 };
 
-class SequenceComparer
+class SequenceAlignment
 {
     private:
         vector<vector<Cell> > _dpTable;
@@ -81,28 +105,19 @@ class SequenceComparer
         bool _hasPositiveScore(const struct DpCell& cell);
 
     public:
-        SequenceComparer();
-        ~SequenceComparer();
+        SequenceAlignment();
+        ~SequenceAlignment();
 
         void PrintResult(const Sequence& sequence1, const Sequence& sequence2, const Params& params, const Alignment& alignment);
         void NeedlemanWunsch(const string& seq1, const string& seq2, Params& params, Alignment& alignment);
         void SmithWaterman(const string& seq1, const string& seq2, Params& params, Alignment& alignment);
         //needleman-wunsch
         //int GetLevenshteinDist(string s1, string s2, );
-        //string GetLCS(string s1, string s2);
+        //string GetLCS(string s1, string s2);  <-- use a suffix tree, not an alignment
 };
 
 void ParseFastaFile(const string fname, Sequence& s1, Sequence& s2);
 void ParseParamsFile(const string& fname, Params& params);
 bool fileExists(const string& path);
-
-
-
-
-
-
-
-
-
 
 

@@ -18,7 +18,7 @@
     g++ -o seqcmp main.cpp Source.cpp -std=c++0x -O2
 *******************************************************************************************/
 
-#include "Header.hpp"
+#include "SequenceAlignment.hpp"
 
 int main(int argc, char** argv)
 {
@@ -63,7 +63,7 @@ int main(int argc, char** argv)
     //read the sequences
     ParseFastaFile(fasta, seq1, seq2);
 
-    SequenceComparer* stringComp = new SequenceComparer();
+    SequenceAlignment* stringComp = new SequenceAlignment();
 
     if(isGlobal){
       stringComp->NeedlemanWunsch(seq1.seq,seq2.seq,params,alignment);
@@ -78,4 +78,3 @@ int main(int argc, char** argv)
 
     return 0;
 }
-
