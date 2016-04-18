@@ -179,12 +179,15 @@ Implements NeedlemanWunsch algorithm using an affine scoring strategy. The algor
 local or global alignment.
 
 This implementation follows the matrix formality of having seq1 represented row-wise, seq2 is column-wise.
+
+verbose: whether or not to store the alignment itself, along with the numerical scores. If false, only the numbers will be kept.
 */
-void SequenceAlignment::NeedlemanWunsch(const string& seq1, const string& seq2, Params& params, Alignment& alignment)
+void SequenceAlignment::NeedlemanWunsch(const string& seq1, const string& seq2, Params& params, Alignment& alignment, bool verbose)
 {
     int i, j, state, prevState;
     bool isMatch;
 
+    _verbose = verbose;
     alignment.method = "NeedlemanWunsch";
 
     //init the matrix
@@ -355,6 +358,49 @@ int SequenceAlignment::_getPrevState(const int curState, const Cell& cell, const
   return previous;
 }
 
+void SequenceAlignment::_verboseUpdate(const int curState, const int prevState, Alignment& alignment, const bool isMatch, const int i, const int j, const string& seq1, const string& seq2)
+{
+    char c1, c2;
+
+    c1 = c2 = '-';
+    if (i >= 0) {
+        c1 = seq1[i];
+    }
+    if (j >= 0) {
+        c2 = seq2[j];
+    }
+
+    if (curState == DEL) {  //deletion
+        alignment.gaps++;
+        alignment.s1 = c1 + alignment.s1;
+        alignment.s2 = "-" + alignment.s2;
+        alignment.bridge = " " + alignment.bridge;
+    }
+    else if (curState == INS) {  //insertion
+        alignment.gaps++;
+        alignment.s1 = "-" + alignment.s1;
+        alignment.s2 = c2 + alignment.s2;
+        alignment.bridge = " " + alignment.bridge;
+    }
+    else if (curState == SUB) {  //substitution
+        if (isMatch) {
+            alignment.matches++;
+            alignment.s1 = c1 + alignment.s1;
+            alignment.s2 = c2 + alignment.s2;
+            alignment.bridge = "|" + alignment.bridge;
+        }
+        else {
+            alignment.mismatches++;
+            alignment.s1 = c1 + alignment.s1;
+            alignment.s2 = c2 + alignment.s2;
+            alignment.bridge = " " + alignment.bridge;
+        }
+    }
+    else {
+        cout << "ERROR unmapped state in updateAlignment" << endl;
+    }
+}
+
 /*
 Updates the alignment and score, while backtracking.
 
@@ -367,62 +413,82 @@ j: col of current cell - 1, and jth index of seq2
 */
 void SequenceAlignment::_updateAlignment(const int curState, const int prevState, Alignment& alignment, const bool isMatch, const int i, const int j, const string& seq1, const string& seq2)
 {
-  char c1, c2;
-
-  c1 = c2 = '-';
-  if(i >= 0){
-    c1 = seq1[i];
-  }
-  if(j >= 0){
-    c2 = seq2[j];
-  }
-
-  if(curState == DEL){  //deletion
-    alignment.gaps++;
-    alignment.s1 = c1 + alignment.s1;
-    alignment.s2 = "-" + alignment.s2;
-    alignment.bridge = " " + alignment.bridge;
-  }
-  else if(curState == INS){  //insertion
-    alignment.gaps++;
-    alignment.s1 = "-" + alignment.s1;
-    alignment.s2 = c2 + alignment.s2;
-    alignment.bridge = " " + alignment.bridge;
-  }
-  else if(curState == SUB){  //substitution
-    if(isMatch){
-      alignment.matches++;
-      alignment.s1 = c1 + alignment.s1;
-      alignment.s2 = c2 + alignment.s2;
-      alignment.bridge = "|" + alignment.bridge;
+    //update the alignment numerical info
+    switch (curState) {
+    case DEL:
+        alignment.gaps++;
+        break;
+    case INS:
+        alignment.gaps++;
+        break;
+    case SUB:
+        if (isMatch)
+            alignment.matches++;
+        else
+            alignment.mismatches++;
+        break;
+    default:
+        cout << "ERROR unmapped state in updateAlignment" << endl;
+        break;
     }
-    else{
-      alignment.mismatches++;
-      alignment.s1 = c1 + alignment.s1;
-      alignment.s2 = c2 + alignment.s2;
-      alignment.bridge = " " + alignment.bridge;
-    }
-  }
-  else{
-    cout << "ERROR unmapped state in updateAlignment" << endl;
-  }
 
-  //account for opening gaps
-  if(curState != DEL && prevState == DEL){
-    alignment.openingGaps++;
-  }
-  if(curState != INS && prevState == INS){
-    alignment.openingGaps++;
-  }
+    //account for opening gaps
+    if (curState != DEL && prevState == DEL) {
+        alignment.openingGaps++;
+    }
+    if (curState != INS && prevState == INS) {
+        alignment.openingGaps++;
+    }
+
+    //if verbose is set, build the actual alignment strings. TODO: the string building could be made much much faster, if needed.
+    if (_verbose) {
+        char c1, c2;
+        c1 = c2 = '-';
+        if (i >= 0) {
+            c1 = seq1[i];
+        }
+        if (j >= 0) {
+            c2 = seq2[j];
+        }
+
+        switch (curState) {
+        case DEL:
+            alignment.s1 = c1 + alignment.s1;
+            alignment.s2 = "-" + alignment.s2;
+            alignment.bridge = " " + alignment.bridge;
+            break;
+        case INS:
+            alignment.s1 = "-" + alignment.s1;
+            alignment.s2 = c2 + alignment.s2;
+            alignment.bridge = " " + alignment.bridge;
+            break;
+        case SUB:
+            if (isMatch) {
+                alignment.s1 = c1 + alignment.s1;
+                alignment.s2 = c2 + alignment.s2;
+                alignment.bridge = "|" + alignment.bridge;
+            }
+            else {
+                alignment.s1 = c1 + alignment.s1;
+                alignment.s2 = c2 + alignment.s2;
+                alignment.bridge = " " + alignment.bridge;
+            }
+            break;
+        default:
+            cout << "ERROR unmapped state in updateAlignment" << endl;
+            break;
+        }
+    }
 }
 
-void SequenceAlignment::SmithWaterman(const string& seq1, const string& seq2, Params& params, Alignment& alignment)
+void SequenceAlignment::SmithWaterman(const string& seq1, const string& seq2, Params& params, Alignment& alignment, bool verbose)
 {
     int i, j, state, prevState;
     int maxScore;
     bool isMatch;
     pair<int, int> maxIndices;
 
+    _verbose = verbose;
     alignment.method = "SmithWaterman";
 
     //init the matrix
@@ -472,7 +538,7 @@ void SequenceAlignment::SmithWaterman(const string& seq1, const string& seq2, Pa
 
     //_printTable(_dpTable);
 
-    cout << "max at (i,j): " << maxIndices.first << "  " << maxIndices.second << endl;
+    //cout << "max at (i,j): " << maxIndices.first << "  " << maxIndices.second << endl;
     cout << "\r\nBacktracking to find optimal alignment..." << endl;
     //global backtrack: from bottom-right cell to find optimal alignment, and track score
     //The only difference between NeedlemanWunsch and SW is where the backtracking begins: from the maxScore
@@ -482,7 +548,7 @@ void SequenceAlignment::SmithWaterman(const string& seq1, const string& seq2, Pa
     j = maxIndices.second;
     alignment.Clear();
     alignment.maxScore = _maxThree(_dpTable[i][j].deletionScore, _dpTable[i][j].insertionScore, _dpTable[i][j].substitutionScore);
-    cout << "Max score is: " << alignment.maxScore << endl;
+    //cout << "Max score is: " << alignment.maxScore << endl;
     prevState = SUB;
     while (_hasPositiveScore(_dpTable[i][j]) && i > 0 && j > 0) {
         //update isMatch
@@ -553,31 +619,11 @@ void SequenceAlignment::SmithWaterman(const string& seq1, const string& seq2, Pa
         alignment.s1 = alignment.s1.substr(1, alignment.s1.length() - 1);
         alignment.s2 = alignment.s2.substr(1, alignment.s2.length() - 1);
     }
-
-
-
-    /*
-    //met left column; so count all remaining j as deletions
-    while (j > 0) {
-        state = DEL;
-        _updateAlignment(state, prevState, alignment, false, i - 1, j - 1, seq1, seq2);
-        prevState = DEL;
-        j--;
-    }
-    //met top row: so count all remaining i as insertions
-    while (i > 0) {
-        state = INS;
-        _updateAlignment(state, prevState, alignment, false, i - 1, j - 1, seq1, seq2);
-        prevState = INS;
-        i--;
-    }
-    */
-
+    
     //lastly, if the first state was INS or DEL, account for this as the opening gap it is
     if (state == INS || state == DEL) {
         alignment.openingGaps++;
     }
-    
 
     _clearTable();
 }

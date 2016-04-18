@@ -47,6 +47,11 @@ typedef struct DpCell {
     SCORE insertionScore;
     SCORE substitutionScore;
     //CellFlag flag;
+
+    //custom for prg3; these are terribly space inefficient for very large alignments, but fine for small ones
+    //int matches;
+    //int alignmentLen;
+
     ///... // add any other field(s) that you may need for the implementation
 }Cell;
 
@@ -88,6 +93,7 @@ public:
 class SequenceAlignment
 {
     private:
+        bool _verbose;
         vector<vector<Cell> > _dpTable;
         void _clearTable();
         void _resize(int rows, int cols);
@@ -103,15 +109,14 @@ class SequenceAlignment
         void _updateAlignment(const int curState, const int prevState, Alignment& alignment, const bool isMatch, const int i, const int j, const string& seq1, const string& seq2);
         int _getPrevState(const int curState, const Cell& cell, const Params& params, const bool isMatch);
         bool _hasPositiveScore(const struct DpCell& cell);
-
+        void _verboseUpdate(const int curState, const int prevState, Alignment& alignment, const bool isMatch, const int i, const int j, const string& seq1, const string& seq2);
     public:
         SequenceAlignment();
         ~SequenceAlignment();
 
         void PrintResult(const Sequence& sequence1, const Sequence& sequence2, const Params& params, const Alignment& alignment);
-        void NeedlemanWunsch(const string& seq1, const string& seq2, Params& params, Alignment& alignment);
-        void SmithWaterman(const string& seq1, const string& seq2, Params& params, Alignment& alignment);
-        //needleman-wunsch
+        void NeedlemanWunsch(const string& seq1, const string& seq2, Params& params, Alignment& alignment, bool verbose=true);
+        void SmithWaterman(const string& seq1, const string& seq2, Params& params, Alignment& alignment, bool verbose=true);
         //int GetLevenshteinDist(string s1, string s2, );
         //string GetLCS(string s1, string s2);  <-- use a suffix tree, not an alignment
 };
