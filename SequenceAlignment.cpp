@@ -472,6 +472,7 @@ void SequenceAlignment::SmithWaterman(const string& seq1, const string& seq2, Pa
 
     //_printTable(_dpTable);
 
+    cout << "max at (i,j): " << maxIndices.first << "  " << maxIndices.second << endl;
     cout << "\r\nBacktracking to find optimal alignment..." << endl;
     //global backtrack: from bottom-right cell to find optimal alignment, and track score
     //The only difference between NeedlemanWunsch and SW is where the backtracking begins: from the maxScore
@@ -490,7 +491,7 @@ void SequenceAlignment::SmithWaterman(const string& seq1, const string& seq2, Pa
         state = _getMaxDirection(_dpTable[i][j]);
         _updateAlignment(state, prevState, alignment, isMatch, i - 1, j - 1, seq1, seq2);
 
-        //update the scores of the next cell, reversing the affine scoring rules
+        //update the scores of the previous cell, reversing the affine scoring rules
         switch (state) {
         case DEL:
             i--;
@@ -524,10 +525,36 @@ void SequenceAlignment::SmithWaterman(const string& seq1, const string& seq2, Pa
             cout << "UNKNOWN BACKTRACK STATE: " << state << endl;
             break;
         }
-
         prevState = state;
     }
-    //post loop: either i or j are zero (or both), so account for remaining cases in next loops
+    //post loop: reached a cell with no further positive values from which to backtrack in local alignment fashion
+
+    //the previous loop exits on traversal too late, often including a deletion or insertion at the front of the alignment (suboptimally)
+    //this small fix reverses that. TODO: loop could be refactored so this isn't necessary. This is also likely to break fo degenerate cases, like single-char strings.
+    cout << "table cell scores (I,D,S): " << _dpTable[i][j].deletionScore << " " << _dpTable[i][j].insertionScore << " " << _dpTable[i][j].substitutionScore << endl;
+    cout << "last state: " << prevState << endl;
+    if (!isMatch) {  //only do the 'undo last' if last state was not a match
+        switch (prevState) {
+        case DEL:
+            alignment.openingGaps--;
+            alignment.gaps--;
+            break;
+        case INS:
+            alignment.openingGaps--;
+            alignment.gaps--;
+            break;
+        case SUB:
+            alignment.mismatches--;
+            break;
+        default: cout << "ERROR unreachable case reached for prevState! In SmithWaterman()" << endl;
+            break;
+        }
+        alignment.bridge = alignment.bridge.substr(1, alignment.bridge.length() - 1);
+        alignment.s1 = alignment.s1.substr(1, alignment.s1.length() - 1);
+        alignment.s2 = alignment.s2.substr(1, alignment.s2.length() - 1);
+    }
+
+
 
     /*
     //met left column; so count all remaining j as deletions
@@ -550,6 +577,7 @@ void SequenceAlignment::SmithWaterman(const string& seq1, const string& seq2, Pa
     if (state == INS || state == DEL) {
         alignment.openingGaps++;
     }
+    
 
     _clearTable();
 }
