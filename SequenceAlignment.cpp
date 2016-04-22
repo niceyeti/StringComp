@@ -151,7 +151,7 @@ void SequenceAlignment::_clearTable()
 //Report progress every 50th row; clearly this ignores the cost/variation of row lengths
 void SequenceAlignment::_reportProgress(int row, int numRows)
 {
-    if (row % 50 == 0) {
+    if (row % 100 == 99) {
         cout << "\r" << (((float)row / (float)numRows) * 100.0) << "% complete...      " << flush;
     }
 }
@@ -491,6 +491,7 @@ void SequenceAlignment::SmithWaterman(const string& seq1, const string& seq2, Pa
     int i, j, state, prevState;
     int maxScore;
     bool isMatch;
+    bool isHugeMatrix = (seq1.length() * seq2.length()) > 1000000;
     pair<int, int> maxIndices;
 
     _verbose = verbose;
@@ -511,7 +512,7 @@ void SequenceAlignment::SmithWaterman(const string& seq1, const string& seq2, Pa
         _dpTable[i][0].substitutionScore = 0;
     }
 
-    cout << "Running SmithWaterman forward algorithm..." << endl;
+    //cout << "Running SmithWaterman forward algorithm..." << endl;
     //run forward algorithm
     maxScore = NEG_INF;
     for (i = 1; i < _dpTable.size(); i++) {
@@ -537,14 +538,16 @@ void SequenceAlignment::SmithWaterman(const string& seq1, const string& seq2, Pa
                 maxIndices.second = j;
             }
         }
-        //show progress
-        _reportProgress(i, _dpTable.size());
+        //show progress for large tables (> 1M cells)
+        if (isHugeMatrix && _verbose) {
+            _reportProgress(i, _dpTable.size());
+        }
     }
 
     //_printTable(_dpTable);
 
     //cout << "max at (i,j): " << maxIndices.first << "  " << maxIndices.second << endl;
-    cout << "\r\nBacktracking to find optimal alignment..." << endl;
+    //cout << "\r\nBacktracking to find optimal alignment..." << endl;
     //global backtrack: from bottom-right cell to find optimal alignment, and track score
     //The only difference between NeedlemanWunsch and SW is where the backtracking begins: from the maxScore
     //cell, rather than the last cell. TODO: Other than the entry point for backtracking, and loop backtrack
@@ -602,8 +605,8 @@ void SequenceAlignment::SmithWaterman(const string& seq1, const string& seq2, Pa
 
     //the previous loop exits on traversal too late, often including a deletion or insertion at the front of the alignment (suboptimally)
     //this small fix reverses that. TODO: loop could be refactored so this isn't necessary. This is also likely to break fo degenerate cases, like single-char strings.
-    cout << "table cell scores (I,D,S): " << _dpTable[i][j].deletionScore << " " << _dpTable[i][j].insertionScore << " " << _dpTable[i][j].substitutionScore << endl;
-    cout << "last state: " << prevState << endl;
+    //cout << "table cell scores (I,D,S): " << _dpTable[i][j].deletionScore << " " << _dpTable[i][j].insertionScore << " " << _dpTable[i][j].substitutionScore << endl;
+    //cout << "last state: " << prevState << endl;
     if (!isMatch) {  //only do the 'undo last' if last state was not a match
         switch (prevState) {
         case DEL:
@@ -620,9 +623,12 @@ void SequenceAlignment::SmithWaterman(const string& seq1, const string& seq2, Pa
         default: cout << "ERROR unreachable case reached for prevState! In SmithWaterman()" << endl;
             break;
         }
-        alignment.bridge = alignment.bridge.substr(1, alignment.bridge.length() - 1);
-        alignment.s1 = alignment.s1.substr(1, alignment.s1.length() - 1);
-        alignment.s2 = alignment.s2.substr(1, alignment.s2.length() - 1);
+
+        if (_verbose) {
+            alignment.bridge = alignment.bridge.substr(1, alignment.bridge.length() - 1);
+            alignment.s1 = alignment.s1.substr(1, alignment.s1.length() - 1);
+            alignment.s2 = alignment.s2.substr(1, alignment.s2.length() - 1);
+        }
     }
     
     //lastly, if the first state was INS or DEL, account for this as the opening gap it is
