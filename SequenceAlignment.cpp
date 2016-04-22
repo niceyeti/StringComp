@@ -495,6 +495,7 @@ void SequenceAlignment::SmithWaterman(const string& seq1, const string& seq2, Pa
     pair<int, int> maxIndices;
 
     _verbose = verbose;
+    alignment.Clear();
     alignment.method = "SmithWaterman";
 
     //init the matrix
