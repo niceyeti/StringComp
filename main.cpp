@@ -50,7 +50,7 @@ int main(int argc, char** argv)
       }
 
       //populate the parameter object
-      ParseParamsFile(config, params);
+      SequenceAlignment::ParseParamsFile(config, params);
     }
     else{
       config = "default";
@@ -61,7 +61,7 @@ int main(int argc, char** argv)
     }
 
     //read the sequences
-    ParseFastaFile(fasta, seq1, seq2);
+    parse2FastaFile(fasta, seq1, seq2);
 
     SequenceAlignment* stringComp = new SequenceAlignment();
 

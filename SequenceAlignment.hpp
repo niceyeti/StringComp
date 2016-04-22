@@ -32,6 +32,8 @@
 #include <limits.h>
 #endif
 
+#include "..\..\mccreight\mccreight\Util.hpp"
+
 using namespace std;
 
 //consider using this to cut down on matrix size, using smallest native int possible, capable of holding max/min possible score.
@@ -63,11 +65,6 @@ typedef struct Parameters {
     int g;
 }Params;
 
-typedef struct sequence{
-  string seq;
-  string desc;
-}Sequence;
-
 class Alignment {
 public:
 
@@ -88,6 +85,7 @@ public:
     void Clear();
     void Print();
     void PrintValidity(const Parameters& params) const;
+    int Length();
 };
 
 class SequenceAlignment
@@ -113,6 +111,7 @@ class SequenceAlignment
     public:
         SequenceAlignment();
         ~SequenceAlignment();
+        static void ParseParamsFile(const string& fname, Params& params);
 
         void PrintResult(const Sequence& sequence1, const Sequence& sequence2, const Params& params, const Alignment& alignment);
         void NeedlemanWunsch(const string& seq1, const string& seq2, Params& params, Alignment& alignment, bool verbose=true);
@@ -121,8 +120,6 @@ class SequenceAlignment
         //string GetLCS(string s1, string s2);  <-- use a suffix tree, not an alignment
 };
 
-void ParseFastaFile(const string fname, Sequence& s1, Sequence& s2);
-void ParseParamsFile(const string& fname, Params& params);
-bool fileExists(const string& path);
-
-
+//void ParseFastaFile(const string fname, Sequence& s1, Sequence& s2);
+//void ParseParamsFile(const string& fname, Params& params);
+//bool fileExists(const string& path);

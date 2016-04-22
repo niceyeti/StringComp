@@ -17,6 +17,11 @@ void Alignment::Clear()
     bridge.clear();
 }
 
+int Alignment::Length()
+{
+    return gaps + matches + mismatches;
+}
+
 void Alignment::PrintValidity(const Parameters& params) const
 {
   cout << "parameters g, h, ma, mi: " << params.g << " " << params.h << " " << params.match << " " << params.mismatch << endl;
@@ -762,6 +767,7 @@ int SequenceAlignment::_maxThree(int a, int b, int c)
     return max;
 }
 
+/*
 //returns a string filtered of all but characters in validChars
 string filter(const string& s, const string& validChars)
 {
@@ -776,10 +782,9 @@ string filter(const string& s, const string& validChars)
     return filtered;
 }
 
-/*
 
-*/
-void ParseFastaFile(const string fname, Sequence& seq1, Sequence& seq2)
+
+void Parse2FastaFile(const string fname, Sequence& seq1, Sequence& seq2)
 {
     int seqnum;
     ifstream myReadFile;
@@ -828,8 +833,9 @@ void ParseFastaFile(const string fname, Sequence& seq1, Sequence& seq2)
     //cout << "s1 >>" << s1 << endl;
     //cout << "s2 >>" << s2 << endl;
 }
+*/
 
-void ParseParamsFile(const string& fname, Params& params)
+void SequenceAlignment::ParseParamsFile(const string& fname, Params& params)
 {
     ifstream myReadFile;
     myReadFile.open(fname);
@@ -871,6 +877,7 @@ void ParseParamsFile(const string& fname, Params& params)
     cout << "Parsed params (mismatch,match,g,h): " << params.mismatch << "," << params.match << "," << params.g << "," << params.h << endl;
 }
 
+/*
 bool fileExists(const string& path)
 {
   ifstream myStream(path);
@@ -882,6 +889,6 @@ bool fileExists(const string& path)
 
   return fileAccessible;
 }
-
+*/
 
 
