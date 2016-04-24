@@ -37,6 +37,28 @@ SequenceAlignment::SequenceAlignment()
 SequenceAlignment::~SequenceAlignment()
 {
     _clearTable();
+    ClearOptimizedTable();
+}
+
+/*
+For time optimized algs.
+TODO: This should be merged with _resize().
+*/
+void SequenceAlignment::_resizeInPlace_Optimized(int rows, int cols)
+{
+    //TODO: error checks on rows cols
+
+    //resize rows, only if needed
+    if (_optimizedTable.size() < rows) {
+        _optimizedTable.resize(rows);
+    }
+
+    //resize columns, only if needed
+    if (_optimizedTable[0].size() < cols) {
+        for (int i = 0; i < _optimizedTable.size(); i++) {
+            _optimizedTable[i].resize(cols);
+        }
+    }
 }
 
 /*
@@ -44,6 +66,7 @@ Resizes the (square) matrix.
 */
 void SequenceAlignment::_resize(int rows, int cols)
 {
+    //TODO even for the non-optimized function, its not necessary to clear() and then resize/init the entire table; this was just for debugging
     DpCell cell;
     cell.deletionScore = NEG_INF;
     cell.insertionScore = NEG_INF;
@@ -486,6 +509,151 @@ void SequenceAlignment::_updateAlignment(const int curState, const int prevState
     }
 }
 
+/*
+An optimized version of SmithWaterman for when the client only needs the numerica scores, not any string alignment info.
+Thre are cases when SmithWaterman is called at high frequency for modestly-sized strings (~100 chars), such as read-mapping.
+This is time optimized to get the scoring info as quickly as possible.
+1) Keeps the old table around, to prevent reallocs
+2) strings are passed via indices, so substrings need not be copied from some source (such as a genome)
+3) Alignment matches and length are found in the forward pass
+
+So note that this function is stateful. The maximum table size will be maintained between calls to avert
+frequent (needless) reallocs. The client must manually call ClearOptimizedTable() if they want to clear the table.
+
+Params:
+@i1: The index at which to start comparisons in seq1
+@n1: The number of characters to compare, starting at n1
+@src1: The first seuence for comparison; this sequence could be very large. i1 and n1 are used to denote the substring to compare.
+@i2: The index at which to start comparisons in seq2
+@n2: The number of characters to compare, starting at n2
+@src2: The second source sequence, where i2 and n2 indicate a substring to align.
+
+TODO: Write one for NeedlemanWunsch
+*/
+void SequenceAlignment::SmithWaterman_Optimized(int offset1, int n1, const string& src1, int offset2, int n2, const string& src2, Params& params, OptimizedAlignment& alignment)
+{
+    int i, j;
+    int maxScore;
+    pair<int, int> maxIndices;
+
+    if (offset1 < 0 || offset1 >= src1.length() || (offset1 + n1) > src1.length()) {
+        cout << "ERROR bad src1 indices, alignment aborted" << offset1 << " " << n1 << " " << src1.length() << endl;
+        return;
+    }
+    if (offset2 < 0 || offset2 >= src2.length() || (offset2  + n2) > src2.length()) {
+        cout << "ERROR bad src2 indices, alignment aborted: " << offset2 << " " << n2 << " " << src2.length() << endl;
+        return;
+    }
+    //optimized version is not space-efficient, and my OS threw proc-kill exceptions for inputs of ~10000 x ~10000.
+    if (n1 > 1000) {
+        cout << "ERROR n1 = " << n1 << " > 1000. Maximum input sequence length is 1000 for optimized SmithWaterman. Alignment aborted" << endl;
+        return;
+    }
+    if (n2 > 1000) {
+        cout << "ERROR n2 = " << n2 << " > 1000. Maximum input sequence length is 1000 for optimized SmithWaterman. Alignment aborted" << endl;
+        return;
+    }
+
+
+
+    //resize the matrix, only if it is currently too small
+    _resizeInPlace_Optimized(n1 + 1, n2 + 1);
+
+    //init all values in first column to zero
+    for (j = 0; j < _optimizedTable[0].size(); j++) {
+        _clearOptimizedScore(_optimizedTable[0][j].deletionScore);
+        _clearOptimizedScore(_optimizedTable[0][j].insertionScore);
+        _clearOptimizedScore(_optimizedTable[0][j].substitutionScore);
+    }
+    //init all vals in first column to zero
+    for (i = 0; i < _optimizedTable.size(); i++) {
+        _clearOptimizedScore(_optimizedTable[i][0].deletionScore);
+        _clearOptimizedScore(_optimizedTable[i][0].insertionScore);
+        _clearOptimizedScore(_optimizedTable[i][0].substitutionScore);
+    }
+
+    //cout << "Running SmithWaterman forward algorithm..." << endl;
+    //run forward algorithm
+    maxScore = NEG_INF;
+    for (i = 1; i < _optimizedTable.size(); i++) {
+        for (j = 1; j < _optimizedTable[i].size(); j++) {
+            //propagate the scores, by row
+            _scoreAffine_SmithWaterman_Opt(src1[offset1 + i - 1], src2[offset2 + j - 1], i, j, _optimizedTable, params);
+
+            //update the max-score and its location, as needed
+            OptimizedCell& cell = _optimizedTable[i][j];
+            if (maxScore < cell.deletionScore.score) {
+                maxScore = cell.deletionScore.score;
+                maxIndices.first = i;
+                maxIndices.second = j;
+            }
+            if (maxScore < cell.insertionScore.score) {
+                maxScore = cell.insertionScore.score;
+                maxIndices.first = i;
+                maxIndices.second = j;
+            }
+            if (maxScore < cell.substitutionScore.score) {
+                maxScore = cell.substitutionScore.score;
+                maxIndices.first = i;
+                maxIndices.second = j;
+            }
+        }
+        //show progress for large tables (> 1M cells)
+        //if (isHugeMatrix && _verbose) {
+        //    _reportProgress(i, _optimizedTable.size());
+        //}
+    }
+
+    //no backtracking; with this version the desire information was lready propagated in the forward step
+    cout << "Max located at cell[][]: " << maxIndices.first << ":" << maxIndices.second << endl;
+    cout << "i, j: " << i << ":" << j << endl;
+    cout << "max: " << maxScore << endl;
+    OptimizedCell& maxCell = _optimizedTable[maxIndices.first][maxIndices.second];
+    //deletion score is the greatest
+    if (maxCell.deletionScore.score >= maxCell.insertionScore.score && maxCell.deletionScore.score >= maxCell.substitutionScore.score) {
+        alignment.numMatches = maxCell.deletionScore.matches;
+        alignment.length = maxCell.deletionScore.alignmentLength;
+    }
+    //insertion score is greatest
+    else if (maxCell.insertionScore.score >= maxCell.deletionScore.score && maxCell.insertionScore.score >= maxCell.substitutionScore.score) {
+        alignment.numMatches = maxCell.insertionScore.matches;
+        alignment.length = maxCell.insertionScore.alignmentLength;
+    }
+    //substitution score is greatest
+    else {
+        alignment.numMatches = maxCell.substitutionScore.matches;
+        alignment.length = maxCell.substitutionScore.alignmentLength;
+    }
+
+    //Note: table is preserved in its current size, and is not cleared or cleaned up on exit.
+    //For the optimal implementation, it becomes the caller's responsibility to clear it for memory reduction, etc.
+}
+
+/*
+For the optimal local alignment method, the table size is preserved between calls, as an optimization.
+Thus it will grow in size for larger string inputs, and will remain that size until the client calls this.
+So for optimal alignment, it becomes the caller's responsibility to clear the table as needed.
+*/
+void SequenceAlignment::ClearOptimizedTable()
+{
+    for (int i = 0; i < _optimizedTable.size(); i++) {
+        _optimizedTable[i].clear();
+    }
+    _optimizedTable.clear();
+}
+
+int SequenceAlignment::GetOptimizedTableSize()
+{
+    int size = 0;
+
+    if (_optimizedTable.size() > 0) {
+        size = _optimizedTable.size() * _optimizedTable[0].size();
+    }
+
+    return size;
+}
+
+
 void SequenceAlignment::SmithWaterman(const string& seq1, const string& seq2, Params& params, Alignment& alignment, bool verbose)
 {
     int i, j, state, prevState;
@@ -661,6 +829,34 @@ void SequenceAlignment::_printTable(const vector<vector<DpCell> >& dpTable)
     cout << endl;
 }
 
+void SequenceAlignment::_scoreAffine_SmithWaterman_Opt(char a, char b, int row, int col, vector<vector<OptimizedCell> >& optimizedTable, const Params& params)
+{
+    //detect invalid indices off edges of table
+    /*
+    if (row <= 0 || col <= 0 || row >= dpTable.size() || col >= dpTable[0].size()) {
+    cout << "BAIL; indices in minThree invalid: (row,col)=" << row << ":" << col << endl;
+    exit(1);
+    }
+    */
+    //cout << "aligning: " << a << ":" << b << endl;
+    //get the deletion score for this cell, per affine rules
+    _setAffineDeletionScore_Opt(optimizedTable[row - 1][col], optimizedTable[row][col], params);
+    //get the inserton score for this cell, per affine rules
+    _setAffineInsertionScore_Opt(optimizedTable[row][col - 1], optimizedTable[row][col], params);
+    //get the substitution score for this cell, per character match/mismatch
+    _setAffineSubstitutionScore_Opt((a == b), optimizedTable[row - 1][col - 1], optimizedTable[row][col], params);
+
+    //cout << optimizedTable[row][col].deletionScore.score << " " << optimizedTable[row][col].insertionScore.score << " " << optimizedTable[row][col].substitutionScore.score << endl;
+
+}
+
+void SequenceAlignment::_clearOptimizedScore(OptimizedScore& optScore)
+{
+    optScore.score = 0;
+    optScore.alignmentLength = 0;
+    optScore.matches = 0;
+}
+
 void SequenceAlignment::_scoreAffine_SmithWaterman(char a, char b, int row, int col, vector<vector<DpCell> >& dpTable, const Params& params)
 {
     //detect invalid indices off edges of table
@@ -689,6 +885,136 @@ void SequenceAlignment::_scoreAffine_SmithWaterman(char a, char b, int row, int 
         dpTable[row][col].substitutionScore = 0;
     }
 }
+
+/*
+Sets the deletion score for a given cell(i,j) according to affine rules.
+For cell(i,j), the deletion score is:
+max {
+cell(i-1,j).deletionScore + g
+cell(i-1,j).insertionScore + h + g
+cell(i-1,j).substitutionScore + h + g
+}
+*/
+void SequenceAlignment::_setAffineDeletionScore_Opt(const OptimizedCell& predecessor, OptimizedCell& optCell, const Params& params)
+{
+    int del = predecessor.deletionScore.score + params.g;
+    int sub = predecessor.substitutionScore.score + params.h + params.g;
+    int ins = predecessor.insertionScore.score + params.h + params.g;
+    
+    //substitution score is greatest
+    if (sub >= del && sub >= ins) {
+        optCell.deletionScore.score = sub;
+        optCell.deletionScore.alignmentLength = predecessor.substitutionScore.alignmentLength + 1;
+    }
+    //deletion score is greatest
+    else if (del >= ins && del >= sub) {
+        optCell.deletionScore.score = del;
+        optCell.deletionScore.alignmentLength = predecessor.deletionScore.alignmentLength + 1;
+    }
+    //insertion score is greatest
+    else{
+        optCell.deletionScore.score = ins;
+        optCell.deletionScore.alignmentLength = predecessor.insertionScore.alignmentLength + 1;
+    }
+
+    //reset the score per SW rules if les than zero
+    if (optCell.deletionScore.score < 0) {
+        _clearOptimizedScore(optCell.deletionScore);
+    }
+}
+
+void SequenceAlignment::_setAffineSubstitutionScore_Opt(bool isMatch, const OptimizedCell& predecessor, OptimizedCell& optCell, const Params& params)
+{
+    //alias the scores (more efficient than allocing vars, since this is a high frequency function)
+    int del = predecessor.deletionScore.score;
+    int sub = predecessor.substitutionScore.score;
+    int ins = predecessor.insertionScore.score;
+
+    //cell.substitutionScore.score = _maxThree(predecessor.deletionScore.score, predecessor.substitutionScore.score, predecessor.insertionScore.score);
+
+    //Map the matches/alignments and scores from predecessor cell
+    //substitution score is greatest
+    if (sub >= del && sub >= ins) {
+        optCell.substitutionScore.score = predecessor.substitutionScore.score;
+        optCell.substitutionScore.matches = predecessor.substitutionScore.matches;
+        optCell.substitutionScore.alignmentLength = predecessor.substitutionScore.alignmentLength + 1;
+    }
+    //deletion score is greatest
+    else if (del >= ins && del >= sub) {
+        optCell.substitutionScore.score = predecessor.deletionScore.score;
+        optCell.substitutionScore.matches = predecessor.deletionScore.matches;
+        optCell.substitutionScore.alignmentLength = predecessor.deletionScore.alignmentLength + 1;
+    }
+    //insertion score is greatest
+    else {
+        optCell.substitutionScore.score = predecessor.insertionScore.score;
+        optCell.substitutionScore.matches = predecessor.insertionScore.matches;
+        optCell.substitutionScore.alignmentLength = predecessor.insertionScore.alignmentLength + 1;
+    }
+
+    //update the score per match/mismatch
+    if (isMatch) {
+        optCell.substitutionScore.matches++;
+        optCell.substitutionScore.score += params.match;
+    }
+    else {
+        optCell.substitutionScore.score += params.mismatch;
+    }
+
+    //clear the score if less than zero, per affine rules
+    if (optCell.substitutionScore.score < 0) {
+        _clearOptimizedScore(optCell.substitutionScore);
+    }
+}
+
+/*
+Sets the insertion score for a given cell(i,j) according to affine rules.
+For cell(i,j), the deletion score is:
+max {
+cell(i,j).insertionScore + g
+cell(i,j - 1).deletionScore + h + g
+cell(i,j - 1).substitutionScore + h + g
+}
+*/
+void SequenceAlignment::_setAffineInsertionScore_Opt(const OptimizedCell& predecessor, OptimizedCell& optCell, const Params& params)
+{
+    int ins = predecessor.insertionScore.score + params.g;
+    int sub = predecessor.substitutionScore.score + params.h + params.g;
+    int del = predecessor.deletionScore.score + params.h + params.g;
+
+    //Map the score and alignment length of predecessor cell
+    //substitution score is greatest
+    if (sub >= del && sub >= ins) {
+        optCell.insertionScore.score = sub;
+        optCell.insertionScore.alignmentLength = predecessor.substitutionScore.alignmentLength + 1;
+    }
+    //deletion score is greatest
+    else if (del >= ins && del >= sub) {
+        optCell.insertionScore.score = del;
+        optCell.insertionScore.alignmentLength = predecessor.deletionScore.alignmentLength + 1;
+    }
+    //insertion score is greatest
+    else {
+        optCell.insertionScore.score = ins;
+        optCell.insertionScore.alignmentLength = predecessor.insertionScore.alignmentLength + 1;
+    }
+
+    //reset the score per SW rules if les than zero
+    if (optCell.insertionScore.score < 0) {
+        _clearOptimizedScore(optCell.insertionScore);
+    }
+
+    /*
+    cell.insertionScore.score = _maxThree(predecessor.insertionScore.score + params.g, predecessor.substitutionScore.score + params.h + params.g, predecessor.deletionScore.score + params.h + params.g);
+    if (cell.insertionScore.score < 0) {
+        _clearOptimizedScore(cell.insertionScore);
+    }
+    else {
+        cell.insertionScore.alignmentLength++;
+    }
+    */
+}
+
 
 /*
 Sets the deletion score for a given cell(i,j) according to affine rules.

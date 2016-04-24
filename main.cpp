@@ -28,27 +28,28 @@ int main(int argc, char** argv)
     Params params;
     Alignment alignment;
 
-    if (argc < 3) {  // <executable name> <input file containing both s1 and s2> <0: global, 1: local> <optional: path to parameters config file>
+    if (argc != 4) {  // <executable name> <input file containing both s1 and s2> <0: global, 1: local> <optional: path to parameters config file>
         cout << "Usage: ./seqcmp [fasta file] [0 (global) or 1 (local)] [optional: path to parameter file]" << endl;
         return 1;
     }
-
+    
     //get path to fasta file, containing two sequences
     fasta = argv[1];
     if(!fileExists(fasta)){
        cout << "ERROR file >" << fasta << "< not found or not accessible" << endl;
       return 1;
     }
-
+    
     //get the flag for NeedlemanWunsch (global) or SmithWaterman (local)
     isGlobal = argv[2][0] == '0';
     if(argc == 4){
-      config = argv[3];
+      //config = argv[3];
+        config = "parameters.config";
       if(!fileExists(config)){
         cout << "ERROR file >" << config << "< not found or not accessible" << endl;
         return 1;
       }
-
+    
       //populate the parameter object
       SequenceAlignment::ParseParamsFile(config, params);
     }
@@ -60,19 +61,30 @@ int main(int argc, char** argv)
       params.h = -5;
     }
 
+    //For manual debugging
+    //fasta = "test5.txt";
+    //isGlobal = false;
+    //config = "parameters.config";
+    //SequenceAlignment::ParseParamsFile(config, params);
+
+
     //read the sequences
     parse2FastaFile(fasta, seq1, seq2);
 
     SequenceAlignment* stringComp = new SequenceAlignment();
 
-    if(isGlobal){
-      stringComp->NeedlemanWunsch(seq1.seq,seq2.seq,params,alignment);
-      stringComp->PrintResult(seq1, seq2, params, alignment);
+    if (isGlobal) {
+        stringComp->NeedlemanWunsch(seq1.seq, seq2.seq, params, alignment);
+        stringComp->PrintResult(seq1, seq2, params, alignment);
     }
-    else{
-      stringComp->SmithWaterman(seq1.seq, seq2.seq, params, alignment);
-      stringComp->PrintResult(seq1, seq2, params, alignment);
-    } 
+    else {
+        stringComp->SmithWaterman(seq1.seq, seq2.seq, params, alignment);
+        stringComp->PrintResult(seq1, seq2, params, alignment);
+
+        OptimizedAlignment optAlignment{ 0,0 };
+        stringComp->SmithWaterman_Optimized(0, seq1.seq.length(), seq1.seq, 0, seq2.seq.length(), seq2.seq, params, optAlignment);
+        cout << "Optimized alignment:  " << optAlignment.numMatches << " matches   " << optAlignment.length << " length" << endl;
+    }
    
     delete stringComp;
 
