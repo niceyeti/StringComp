@@ -96,7 +96,7 @@ class SequenceAlignment
         void _clearTable();
         void _resize(int rows, int cols);
         int _maxThree(int a, int b, int c);
-        void _reportProgress(int row, int numRows);
+        inline void _reportProgress(int row, int numRows);
         void _scoreAffine_NeedlemanWunsch(char a, char b, int row, int col, vector<vector<DpCell> >& dpTable, const Params& params);
         void _scoreAffine_SmithWaterman(char a, char b, int row, int col, vector<vector<DpCell> >& dpTable, const Params& params);
         void _printTable(const vector<vector<DpCell> >& dpTable);
